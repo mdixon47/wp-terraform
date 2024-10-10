@@ -97,23 +97,23 @@ resource "aws_security_group" "rds_sg" {
 }
 
 resource "aws_db_instance" "wordpress_db" {
-  allocated_storage    = 20
-  storage_type         = "gp2"
-  engine               = "mysql"
-  engine_version       = "8.0"
-  instance_class       = "db.t2.micro"
-  identifier           = "wordpressdb" // use 'identifier' instead of 'name'
-  username             = "admin"
-  password             = "password123"
-  parameter_group_name = "default.mysql8.0"
-  skip_final_snapshot  = true
-
-  vpc_security_group_ids = [aws_security_group.rds_sg.id]
-
-  tags = {
-    Name = "wordpress-mysql-db"
-  }
+  allocated_storage      = 20
+  engine                 = "mysql"
+  instance_class         = "db.t2.micro"
+  identifier             = "wordpressdb"
+  username               = "admin"
+  password               = "yourpassword"
+  parameter_group_name   = "default.mysql8.0"
+  vpc_security_group_ids = ["sg-12345678"]                             # Update this with your security group ID
+  db_subnet_group_name   = aws_db_subnet_group.my_db_subnet_group.name # Reference the subnet group
+  skip_final_snapshot    = true
 }
+
+resource "aws_db_subnet_group" "my_db_subnet_group" {
+  name       = "my-subnet-group"
+  subnet_ids = ["subnet-12345678", "subnet-87654321"] # Add your subnet IDs here
+}
+
 
 resource "aws_instance" "wordpress" {
   ami           = "ami-0c55b159cbfafe1f0" # Amazon Linux 2 AMI (update as needed)
