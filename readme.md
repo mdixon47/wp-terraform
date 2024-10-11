@@ -48,12 +48,7 @@ To set up Terraform for this project, you will need to install Terraform on your
 # Terraform Errors
 
 ```
- Error: creating RDS DB Instance (wordpressdb): InvalidSubnet: No default subnet detected in VPC. Please contact AWS Support to recreate default Subnets.
-│       status code: 400, request id: b1a274c1-cd8a-40fb-b463-5d9334a634cd
-│ 
-│   with aws_db_instance.wordpress_db,
-│   on main.tf line 99, in resource "aws_db_instance" "wordpress_db":
-│   99: resource "aws_db_instance" "wordpress_db" 
+
 ```
 
 
