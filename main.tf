@@ -91,4 +91,56 @@ resource "aws_db_instance" "wordpress_db" {
     Name = "WordPress DB Instance"
   }
 }
+# Create EC2 instance and install WordPress
+resource "aws_instance" "wordpress" {
+  ami           = "ami-0c55b159cbfafe1f0" # Amazon Linux 2 AMI (update as needed)
+  instance_type = "t2.micro"
+  key_name      = "my-key-pair" # Replace with your key pair
+
+  subnet_id = aws_subnet.public.id
+
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+
+  tags = {
+    Name = "wordpress-server"
+  }
+
+  user_data = <<-EOF
+    #!/bin/bash
+    yum update -y
+    yum install -y httpd
+    amazon-linux-extras install -y php7.4
+    yum install -y php-mysqlnd
+
+    systemctl start httpd
+    systemctl enable httpd
+
+    cd /var/www/html
+    wget https://wordpress.org/latest.tar.gz
+    tar -xzf latest.tar.gz
+    mv wordpress/* .
+    rm -rf wordpress latest.tar.gz
+
+    # Create wp-config.php
+    cp wp-config-sample.php wp-config.php
+    sed -i 's/database_name_here/wordpressdb/' wp-config.php
+    sed -i 's/username_here/admin/' wp-config.php
+    sed -i 's/password_here/password123/' wp-config.php
+    sed -i 's/localhost/${aws_db_instance.wordpress_db.endpoint}/' wp-config.php
+
+    chown -R apache:apache /var/www/html
+    systemctl restart httpd
+  EOF
+}
+
+# Output the RDS instance endpoint information
+
+output "ec2_public_ip" {
+  value = aws_instance.wordpress.public_ip
+}
+
+output "rds_endpoint" {
+  value = aws_db_instance.wordpress_db.endpoint
+}
+
 
