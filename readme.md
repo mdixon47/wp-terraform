@@ -48,14 +48,76 @@ To set up Terraform for this project, you will need to install Terraform on your
 # Terraform Errors
 
 ```
+│ Error: Reference to undeclared resource
+│ 
+│   on main.tf line 100, in resource "aws_instance" "wordpress":
+│  100:   subnet_id = aws_subnet.public.id
+│ 
+│ A managed resource "aws_subnet" "public" has not been declared in the root
+│ module.
+```
 
 ```
+ Error: Reference to undeclared resource
+│ 
+│   on main.tf line 102, in resource "aws_instance" "wordpress":
+│  102:   vpc_security_group_ids = [aws_security_group.web_sg.id]
+│ 
+│ A managed resource "aws_security_group" "web_sg" has not been declared in
+│ the root module.
+```
+
+
 
 
 
 # Terraform Solution
 
-https://chatgpt.com/share/67086247-054c-8011-a001-d723aa082d4a
+Error: 1: The error message is indicating that the resource aws_subnet.public has not been declared anywhere in your Terraform configuration. You're trying to reference it in your aws_instance resource, but Terraform doesn't know what aws_subnet.public is.
+
+To fix this, you need to declare the aws_subnet.public resource in your Terraform configuration. Here's an example of how you might declare this resource:
+
+```
+resource "aws_subnet" "public" {
+  vpc_id     = aws_vpc.main.id # Replace with your VPC ID
+  cidr_block = "10.0.1.0/24"   # Replace with your CIDR block
+
+  tags = {
+    Name = "Public Subnet"
+  }
+}
+```
+
+Error: 2: The error message is indicating that the resource aws_security_group.web_sg has not been declared anywhere in your Terraform configuration. You're trying to reference it in your aws_instance resource, but Terraform doesn't know what aws_security_group.web_sg is.
+
+To fix this, you need to declare the aws_security_group.web_sg resource in your Terraform configuration. Here's an example of how you might declare this resource:
+
+```
+resource "aws_security_group" "web_sg" {
+  name        = "web_sg"
+  description = "Security Group for web servers"
+  vpc_id      = aws_vpc.main.id  # Replace with your VPC ID
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "web_sg"
+  }
+}
+
+```
 
 
 # Breakdown of the Terraform Solution
@@ -88,6 +150,11 @@ https://chatgpt.com/share/67086247-054c-8011-a001-d723aa082d4a
 
     Restricting Security Group: Replace "0.0.0.0/0" in the ingress rule of the security group with specific IP ranges to secure your database instance.
     
+    
+
+
+
+
     
 
 
