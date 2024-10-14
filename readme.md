@@ -47,6 +47,7 @@ To set up Terraform for this project, you will need to install Terraform on your
 - User Data: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#user_data
 - WordPress installation aws: https://aws.amazon.com/getting-started/hands-on/host-wordpress-website/
 - Output: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#outputs
+- EBS Volume: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ebs_volume
 
 # Key Changes
 
