@@ -117,14 +117,14 @@ resource "aws_security_group" "wordpress_sg" {
   }
 }
 
-# Look up the latest Amazon Linux 2023 AMI ID in the current region
-data "aws_ami" "amazon_linux_2023" {
+# Look up the latest Ubuntu AMI (e.g., Ubuntu 20.04 LTS) in the current region
+data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"] # Canonical's AWS account ID for Ubuntu AMIs
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
   }
 
   filter {
@@ -133,28 +133,32 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
-# EC2 Instance 1 with Elastic IP
+
+# EC2 Instance 1 with Elastic IP, using Ubuntu AMI
 resource "aws_instance" "wordpress_instance_1" {
-  ami             = data.aws_ami.amazon_linux_2023.id
+  ami             = data.aws_ami.ubuntu.id
   instance_type   = "t3.micro"
-  subnet_id       = aws_subnet.wordpress_subnet_2.id
+  subnet_id       = aws_subnet.wordpress_subnet_1.id
   security_groups = [aws_security_group.wordpress_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
-              sudo yum update -y
-              sudo amazon-linux-extras enable epel
-              sudo yum install -y epel-release
-              sudo yum install -y httpd mod_ssl certbot python3-certbot-apache
-              
+              sudo apt update -y
+              sudo apt install -y apache2 certbot python3-certbot-apache
+
               # Create a self-signed certificate or configure certbot
               sudo certbot --non-interactive --apache --agree-tos --email your-email@example.com -d yourdomain1.com
 
               # Modify the SSL configuration
-              sudo sed -i '/^<\/VirtualHost>/i \\nSSLVerifyClient none\\nSSLVerifyDepth 1\\n' /etc/httpd/conf.d/ssl.conf
+              sudo sed -i '/^<\/VirtualHost>/i \\nSSLVerifyClient none\\nSSLVerifyDepth 1\\n' /etc/apache2/sites-enabled/000-default-le-ssl.conf
               
               # Restart Apache to apply changes
-              sudo systemctl restart httpd
+              sudo systemctl restart apache2
+
+              # Mount shared volume
+              sudo mkfs -t ext4 /dev/sdh
+              sudo mkdir /mnt/shared
+              sudo mount /dev/sdh /mnt/shared
               EOF
 
   tags = {
@@ -162,36 +166,36 @@ resource "aws_instance" "wordpress_instance_1" {
   }
 }
 
-
-# EC2 Instance 2 with Elastic IP
+# EC2 Instance 2 with Elastic IP, using Ubuntu AMI
 resource "aws_instance" "wordpress_instance_2" {
-  ami             = data.aws_ami.amazon_linux_2023.id
+  ami             = data.aws_ami.ubuntu.id
   instance_type   = "t3.micro"
   subnet_id       = aws_subnet.wordpress_subnet_2.id
   security_groups = [aws_security_group.wordpress_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
-              sudo yum update -y
-              sudo amazon-linux-extras enable epel
-              sudo yum install -y epel-release
-              sudo yum install -y httpd mod_ssl certbot python3-certbot-apache
-              
+              sudo apt update -y
+              sudo apt install -y apache2 certbot python3-certbot-apache
+
               # Create a self-signed certificate or configure certbot
               sudo certbot --non-interactive --apache --agree-tos --email your-email@example.com -d yourdomain2.com
 
               # Modify the SSL configuration
-              sudo sed -i '/^<\/VirtualHost>/i \\nSSLVerifyClient none\\nSSLVerifyDepth 1\\n' /etc/httpd/conf.d/ssl.conf
+              sudo sed -i '/^<\/VirtualHost>/i \\nSSLVerifyClient none\\nSSLVerifyDepth 1\\n' /etc/apache2/sites-enabled/000-default-le-ssl.conf
               
               # Restart Apache to apply changes
-              sudo systemctl restart httpd
+
+              # Mount shared volume
+              sudo mkfs -t ext4 /dev/sdh
+              sudo mkdir /mnt/shared
+              sudo mount /dev/sdh /mnt/shared
               EOF
 
   tags = {
     Name = "WordPress Instance 2"
   }
 }
-
 
 # Elastic Load Balancer (ELB)
 resource "aws_elb" "wordpress_elb" {

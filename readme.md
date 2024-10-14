@@ -44,6 +44,24 @@ To set up Terraform for this project, you will need to install Terraform on your
 - WordPress installation aws: https://aws.amazon.com/getting-started/hands-on/host-wordpress-website/
 - Output: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#outputs
 
+# Key Challenges
+
+## Ubuntu AMI Changes
+
+- Ubuntu AMI Data Source: Finding the correct Ubuntu AMI for the EC2 instance can be challenging due to the region and availability. You can use the AWS CLI to find the latest Ubuntu AMI for your region.
+- Updated Ami Attribute: The AMI attribute may change over time, so you need to update the AMI ID in the Terraform configuration to use the latest AMI for the Ubuntu instance.
+- Updated user data script: The user data script for installing WordPress may need to be updated based on the latest WordPress version and dependencies. You can use the official WordPress installation guide for reference.
+
+## Shared EBS Volume
+
+- EBS Volume: This creates a 10 GB EBS volume and attaches it to the EC2 instance for storing WordPress files and data. You can modify the volume size based on your requirements.
+- EBS Volume Attachment: The EBS volume is attached to the EC2 instance using the `aws_volume_attachment` resource in Terraform. You can specify the device name and mount point for the volume.
+- Mounting the Volume: After attaching the EBS volume, you need to mount the volume to the EC2 instance and configure WordPress to use the volume for storing files and data.
+
+This setup enables both EC2 instances to share an EBS volume, which could be useful for data storage purposes. However, take care with concurrent writes to the volume from both instances—consider using a higher-level shared storage solution like Amazon EFS if that's required.
+
+
+
 
 
 
