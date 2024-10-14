@@ -29,6 +29,9 @@ To create the infrastructure using Terraform, you can run the following commands
 terraform init
 terraform plan
 terraform apply
+terraform destroy
+terraform init - reconfigure
+terraform plan -out=tfplan
 ```
 
 # Terraform Setup
