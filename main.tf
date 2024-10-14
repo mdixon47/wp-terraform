@@ -9,55 +9,100 @@ terraform {
   required_version = ">= 1.2.0"
 }
 
-# Create a custom VPC
-resource "aws_vpc" "wordpress_vpc" {
-  cidr_block = "10.0.0.0/16"
-
-  tags = {
-    Name = "WordPress VPC"
-  }
+provider "aws" {
+  region = "us-east-1" # Replace with your desired AWS region
 }
 
-# Create two subnets in different Availability Zones
-resource "aws_subnet" "wordpress_subnet_1" {
+# VPC
+resource "aws_vpc" "wordpress_vpc" {
+  cidr_block = "10.0.0.0/16"
+}
+
+# Subnet
+resource "aws_subnet" "wordpress_subnet" {
   vpc_id            = aws_vpc.wordpress_vpc.id
   cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-east-1a" # Update based on your region
+  availability_zone = "us-east-1a" # Changed from us-west-1a to us-east-1a
+}
 
-  tags = {
-    Name = "WordPress Subnet 1"
-  }
+resource "aws_subnet" "wordpress_subnet_1" {
+  vpc_id            = aws_vpc.wordpress_vpc.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-1b" # Make sure this is correct
 }
 
 resource "aws_subnet" "wordpress_subnet_2" {
   vpc_id            = aws_vpc.wordpress_vpc.id
-  cidr_block        = "10.0.2.0/24"
-  availability_zone = "us-east-1b" # Update based on your region
-
-  tags = {
-    Name = "WordPress Subnet 2"
-  }
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = "us-east-1c" # This is already correct
 }
 
-# Create a DB Subnet Group
-resource "aws_db_subnet_group" "wordpress_db_subnet_group" {
-  name       = "wordpress-db-subnet-group"
-  subnet_ids = [aws_subnet.wordpress_subnet_1.id, aws_subnet.wordpress_subnet_2.id]
 
-  tags = {
-    Name = "WordPress DB Subnet Group"
-  }
+
+# Internet Gateway
+resource "aws_internet_gateway" "wordpress_igw" {
+  vpc_id = aws_vpc.wordpress_vpc.id
 }
 
-# Create a security group for the RDS instance
-resource "aws_security_group" "wordpress_db_sg" {
+# Route Table
+resource "aws_route_table" "wordpress_route_table" {
+  vpc_id = aws_vpc.wordpress_vpc.id
+}
+
+# Route Table Association
+resource "aws_route_table_association" "wordpress_subnet_association" {
+  subnet_id      = aws_subnet.wordpress_subnet.id
+  route_table_id = aws_route_table.wordpress_route_table.id
+}
+
+
+# Route to Internet Gateway
+resource "aws_route" "wordpress_route" {
+  route_table_id         = aws_route_table.wordpress_route_table.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.wordpress_igw.id
+}
+
+# Elastic IP
+resource "aws_eip" "wordpress_ip_1" {
+  instance = aws_instance.wordpress_instance_1.id
+}
+
+# Associate an Elastic IP with Instance 2
+resource "aws_eip" "wordpress_ip_2" {
+  instance = aws_instance.wordpress_instance_2.id
+}
+
+
+
+resource "aws_db_instance" "wordpress_db" {
+  allocated_storage    = 20
+  engine               = "mysql"
+  engine_version       = "8.0.35"
+  instance_class       = "db.t3.micro"
+  identifier           = "wordpressdb"
+  username             = "admin"
+  password             = "password123"
+  parameter_group_name = "default.mysql8.0"
+  skip_final_snapshot  = true
+}
+
+# Security group for the instances
+resource "aws_security_group" "wordpress_sg" {
   vpc_id = aws_vpc.wordpress_vpc.id
 
   ingress {
-    from_port   = 3306
-    to_port     = 3306
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Restrict this in production to your IP or private CIDR
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -68,79 +113,153 @@ resource "aws_security_group" "wordpress_db_sg" {
   }
 
   tags = {
-    Name = "WordPress DB Security Group"
+    Name = "WordPress Security Group"
   }
 }
 
-# Create the RDS DB Instance using the DB subnet group
-resource "aws_db_instance" "wordpress_db" {
-  allocated_storage      = 20
-  storage_type           = "gp2"
-  engine                 = "mysql"
-  engine_version         = "8.0"
-  instance_class         = "db.t3.micro"
-  identifier             = "wordpressdb"
-  username               = "admin"
-  password               = "password" # Replace with a secure password
-  parameter_group_name   = "default.mysql8.0"
-  db_subnet_group_name   = aws_db_subnet_group.wordpress_db_subnet_group.name
-  vpc_security_group_ids = [aws_security_group.wordpress_db_sg.id]
-  skip_final_snapshot    = true
+# Look up the latest Amazon Linux 2023 AMI ID in the current region
+data "aws_ami" "amazon_linux_2023" {
+  most_recent = true
+  owners      = ["amazon"]
 
-  tags = {
-    Name = "WordPress DB Instance"
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
   }
 }
-# Create EC2 instance and install WordPress
-resource "aws_instance" "wordpress" {
-  ami           = "ami-0c55b159cbfafe1f0" # Amazon Linux 2 AMI (update as needed)
-  instance_type = "t2.micro"
-  key_name      = "my-key-pair" # Replace with your key pair
 
-  subnet_id = aws_subnet.public.id
-
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
-
-  tags = {
-    Name = "wordpress-server"
-  }
+# EC2 Instance 1 with Elastic IP
+resource "aws_instance" "wordpress_instance_1" {
+  ami             = data.aws_ami.amazon_linux_2023.id
+  instance_type   = "t3.micro"
+  subnet_id       = aws_subnet.wordpress_subnet_2.id
+  security_groups = [aws_security_group.wordpress_sg.id]
 
   user_data = <<-EOF
-    #!/bin/bash
-    yum update -y
-    yum install -y httpd
-    amazon-linux-extras install -y php7.4
-    yum install -y php-mysqlnd
+              #!/bin/bash
+              sudo yum update -y
+              sudo amazon-linux-extras enable epel
+              sudo yum install -y epel-release
+              sudo yum install -y httpd mod_ssl certbot python3-certbot-apache
+              
+              # Create a self-signed certificate or configure certbot
+              sudo certbot --non-interactive --apache --agree-tos --email your-email@example.com -d yourdomain1.com
 
-    systemctl start httpd
-    systemctl enable httpd
+              # Modify the SSL configuration
+              sudo sed -i '/^<\/VirtualHost>/i \\nSSLVerifyClient none\\nSSLVerifyDepth 1\\n' /etc/httpd/conf.d/ssl.conf
+              
+              # Restart Apache to apply changes
+              sudo systemctl restart httpd
+              EOF
 
-    cd /var/www/html
-    wget https://wordpress.org/latest.tar.gz
-    tar -xzf latest.tar.gz
-    mv wordpress/* .
-    rm -rf wordpress latest.tar.gz
-
-    # Create wp-config.php
-    cp wp-config-sample.php wp-config.php
-    sed -i 's/database_name_here/wordpressdb/' wp-config.php
-    sed -i 's/username_here/admin/' wp-config.php
-    sed -i 's/password_here/password123/' wp-config.php
-    sed -i 's/localhost/${aws_db_instance.wordpress_db.endpoint}/' wp-config.php
-
-    chown -R apache:apache /var/www/html
-    systemctl restart httpd
-  EOF
+  tags = {
+    Name = "WordPress Instance 1"
+  }
 }
 
-# Output the RDS instance endpoint information
 
-output "ec2_public_ip" {
-  value = aws_instance.wordpress.public_ip
+# EC2 Instance 2 with Elastic IP
+resource "aws_instance" "wordpress_instance_2" {
+  ami             = data.aws_ami.amazon_linux_2023.id
+  instance_type   = "t3.micro"
+  subnet_id       = aws_subnet.wordpress_subnet_2.id
+  security_groups = [aws_security_group.wordpress_sg.id]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo yum update -y
+              sudo amazon-linux-extras enable epel
+              sudo yum install -y epel-release
+              sudo yum install -y httpd mod_ssl certbot python3-certbot-apache
+              
+              # Create a self-signed certificate or configure certbot
+              sudo certbot --non-interactive --apache --agree-tos --email your-email@example.com -d yourdomain2.com
+
+              # Modify the SSL configuration
+              sudo sed -i '/^<\/VirtualHost>/i \\nSSLVerifyClient none\\nSSLVerifyDepth 1\\n' /etc/httpd/conf.d/ssl.conf
+              
+              # Restart Apache to apply changes
+              sudo systemctl restart httpd
+              EOF
+
+  tags = {
+    Name = "WordPress Instance 2"
+  }
 }
 
-output "rds_endpoint" {
-  value = aws_db_instance.wordpress_db.endpoint
+
+# Elastic Load Balancer (ELB)
+resource "aws_elb" "wordpress_elb" {
+  name            = "wordpress-load-balancer"
+  security_groups = [aws_security_group.wordpress_sg.id]
+  subnets         = [aws_subnet.wordpress_subnet_1.id, aws_subnet.wordpress_subnet_2.id]
+
+  listener {
+    instance_port     = 80
+    instance_protocol = "HTTP"
+    lb_port           = 80
+    lb_protocol       = "HTTP"
+  }
+
+  listener {
+    instance_port      = 443
+    instance_protocol  = "HTTPS"
+    lb_port            = 443
+    lb_protocol        = "HTTPS"
+    ssl_certificate_id = "arn:aws:acm:us-east-1:211125385032:certificate/da5a6dd4-6b75-44ae-ac17-edba60dbf2ea"
+  }
+
+  health_check {
+    target              = "HTTP:80/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  instances = [aws_instance.wordpress_instance_1.id, aws_instance.wordpress_instance_2.id]
+
+  tags = {
+    Name = "WordPress Load Balancer"
+  }
 }
+
+
+# Optionally, configure DNS for the ELB
+resource "aws_route53_record" "wordpress_elb_dns" {
+  zone_id = "Z059195515TLG4WDKY4GB" # Replace with your Route53 hosted zone ID
+  name    = "http://www.xspremier.com"
+  type    = "CNAME"
+  ttl     = "300"
+  records = [aws_elb.wordpress_elb.dns_name]
+}
+
+# Shared EBS Volummes
+
+resource "aws_ebs_volume" "shared_volume" {
+  availability_zone    = "us-east-1c"
+  size                 = 100
+  type                 = "io2"
+  iops                 = 3000
+  multi_attach_enabled = true
+}
+
+resource "aws_volume_attachment" "ebs_att_1" {
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.shared_volume.id
+  instance_id = aws_instance.wordpress_instance_1.id
+}
+
+resource "aws_volume_attachment" "ebs_att_2" {
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.shared_volume.id
+  instance_id = aws_instance.wordpress_instance_2.id
+}
+
 
 
