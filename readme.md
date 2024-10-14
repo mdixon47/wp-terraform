@@ -19,8 +19,9 @@ The Terraform configuration will include the following resources:
 - NAT Gateway and Route Table for private subnet
 - Security Groups for EC2 instance and RDS database
 - IAM roles for EC2 instance
-- EC2 instance with user data script to install WordPress
+- Ubuntu AMI EC2 instance with user data script to install WordPress
 - RDS MySQL database
+- EBS volume for shared storage
 
 # Terraform Commands
 To create the infrastructure using Terraform, you can run the following commands:
