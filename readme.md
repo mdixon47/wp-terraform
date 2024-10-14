@@ -44,7 +44,7 @@ To set up Terraform for this project, you will need to install Terraform on your
 - WordPress installation aws: https://aws.amazon.com/getting-started/hands-on/host-wordpress-website/
 - Output: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#outputs
 
-# Key Challenges
+# Key Changes
 
 ## Ubuntu AMI Changes
 
