@@ -1,3 +1,5 @@
+# Updated October 14
+
 terraform {
   required_providers {
     aws = {
@@ -22,7 +24,7 @@ resource "aws_vpc" "wordpress_vpc" {
 resource "aws_subnet" "wordpress_subnet" {
   vpc_id            = aws_vpc.wordpress_vpc.id
   cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-east-1a" # Changed from us-west-1a to us-east-1a
+  availability_zone = "us-east-1a" # Explicitly set the AZ
 }
 
 resource "aws_subnet" "wordpress_subnet_1" {
@@ -36,8 +38,6 @@ resource "aws_subnet" "wordpress_subnet_2" {
   cidr_block        = "10.0.3.0/24"
   availability_zone = "us-east-1c" # This is already correct
 }
-
-
 
 # Internet Gateway
 resource "aws_internet_gateway" "wordpress_igw" {
@@ -63,24 +63,13 @@ resource "aws_route" "wordpress_route" {
   gateway_id             = aws_internet_gateway.wordpress_igw.id
 }
 
-# Elastic IP
-resource "aws_eip" "wordpress_ip_1" {
-  instance = aws_instance.wordpress_instance_1.id
-}
-
-# Associate an Elastic IP with Instance 2
-resource "aws_eip" "wordpress_ip_2" {
-  instance = aws_instance.wordpress_instance_2.id
-}
-
-
-
+# Database Instance
 resource "aws_db_instance" "wordpress_db" {
   allocated_storage    = 20
   engine               = "mysql"
   engine_version       = "8.0.35"
   instance_class       = "db.t3.micro"
-  identifier           = "wordpressdb"
+  identifier           = "wordpressdb-new"
   username             = "admin"
   password             = "password123"
   parameter_group_name = "default.mysql8.0"
@@ -133,12 +122,11 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-
 # EC2 Instance 1 with Elastic IP, using Ubuntu AMI
 resource "aws_instance" "wordpress_instance_1" {
   ami             = data.aws_ami.ubuntu.id
   instance_type   = "t3.micro"
-  subnet_id       = aws_subnet.wordpress_subnet_1.id
+  subnet_id       = aws_subnet.wordpress_subnet.id
   security_groups = [aws_security_group.wordpress_sg.id]
 
   user_data = <<-EOF
@@ -170,7 +158,7 @@ resource "aws_instance" "wordpress_instance_1" {
 resource "aws_instance" "wordpress_instance_2" {
   ami             = data.aws_ami.ubuntu.id
   instance_type   = "t3.micro"
-  subnet_id       = aws_subnet.wordpress_subnet_2.id
+  subnet_id       = aws_subnet.wordpress_subnet.id
   security_groups = [aws_security_group.wordpress_sg.id]
 
   user_data = <<-EOF
@@ -197,9 +185,9 @@ resource "aws_instance" "wordpress_instance_2" {
   }
 }
 
-# Elastic Load Balancer (ELB)
+# Elastic Load Balancer
 resource "aws_elb" "wordpress_elb" {
-  name            = "wordpress-load-balancer"
+  name            = "wordpress-load-balancer-new" # Change this to a new, unique name
   security_groups = [aws_security_group.wordpress_sg.id]
   subnets         = [aws_subnet.wordpress_subnet_1.id, aws_subnet.wordpress_subnet_2.id]
 
@@ -233,20 +221,20 @@ resource "aws_elb" "wordpress_elb" {
   }
 }
 
-
 # Optionally, configure DNS for the ELB
 resource "aws_route53_record" "wordpress_elb_dns" {
-  zone_id = "Z059195515TLG4WDKY4GB" # Replace with your Route53 hosted zone ID
-  name    = "http://www.xspremier.com"
-  type    = "CNAME"
-  ttl     = "300"
-  records = [aws_elb.wordpress_elb.dns_name]
+  zone_id         = "Z059195515TLG4WDKY4GB"
+  name            = "www.xspremier.com" # Remove the "http://" prefix
+  type            = "CNAME"
+  ttl             = "300"
+  records         = [aws_elb.wordpress_elb.dns_name]
+  allow_overwrite = true
 }
 
-# Shared EBS Volummes
 
+# Shared EBS Volummes
 resource "aws_ebs_volume" "shared_volume" {
-  availability_zone    = "us-east-1c"
+  availability_zone    = aws_subnet.wordpress_subnet.availability_zone
   size                 = 100
   type                 = "io2"
   iops                 = 3000
@@ -254,16 +242,13 @@ resource "aws_ebs_volume" "shared_volume" {
 }
 
 resource "aws_volume_attachment" "ebs_att_1" {
-  device_name = "/dev/sdf"
+  device_name = "/dev/sdh" # Changed from /dev/sdf to match your user data script
   volume_id   = aws_ebs_volume.shared_volume.id
   instance_id = aws_instance.wordpress_instance_1.id
 }
 
 resource "aws_volume_attachment" "ebs_att_2" {
-  device_name = "/dev/sdf"
+  device_name = "/dev/sdh" # Changed from /dev/sdf to match your user data script
   volume_id   = aws_ebs_volume.shared_volume.id
   instance_id = aws_instance.wordpress_instance_2.id
 }
-
-
-
