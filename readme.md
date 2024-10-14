@@ -1,4 +1,4 @@
-# Wordpress Terraform Solution Project version 1.0
+# Wordpress Terraform Solution Project version 1.1
 ### Date October 9, 2024
  
 
@@ -45,111 +45,9 @@ To set up Terraform for this project, you will need to install Terraform on your
 - Output: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance#outputs
 
 
-# Terraform Errors
-
-```
-│ Error: Reference to undeclared resource
-│ 
-│   on main.tf line 100, in resource "aws_instance" "wordpress":
-│  100:   subnet_id = aws_subnet.public.id
-│ 
-│ A managed resource "aws_subnet" "public" has not been declared in the root
-│ module.
-```
-
-```
- Error: Reference to undeclared resource
-│ 
-│   on main.tf line 102, in resource "aws_instance" "wordpress":
-│  102:   vpc_security_group_ids = [aws_security_group.web_sg.id]
-│ 
-│ A managed resource "aws_security_group" "web_sg" has not been declared in
-│ the root module.
-```
 
 
 
-
-
-# Terraform Solution
-
-Error: 1: The error message is indicating that the resource aws_subnet.public has not been declared anywhere in your Terraform configuration. You're trying to reference it in your aws_instance resource, but Terraform doesn't know what aws_subnet.public is.
-
-To fix this, you need to declare the aws_subnet.public resource in your Terraform configuration. Here's an example of how you might declare this resource:
-
-```
-resource "aws_subnet" "public" {
-  vpc_id     = aws_vpc.main.id # Replace with your VPC ID
-  cidr_block = "10.0.1.0/24"   # Replace with your CIDR block
-
-  tags = {
-    Name = "Public Subnet"
-  }
-}
-```
-
-Error: 2: The error message is indicating that the resource aws_security_group.web_sg has not been declared anywhere in your Terraform configuration. You're trying to reference it in your aws_instance resource, but Terraform doesn't know what aws_security_group.web_sg is.
-
-To fix this, you need to declare the aws_security_group.web_sg resource in your Terraform configuration. Here's an example of how you might declare this resource:
-
-```
-resource "aws_security_group" "web_sg" {
-  name        = "web_sg"
-  description = "Security Group for web servers"
-  vpc_id      = aws_vpc.main.id  # Replace with your VPC ID
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "web_sg"
-  }
-}
-
-```
-
-
-# Breakdown of the Terraform Solution
-
-## Breakdown of the Solution:
-
- 1. Custom VPC:
-        
-      -  The custom VPC (aws_vpc.wordpress_vpc) is created with a CIDR block of 10.0.0.0/16. This VPC is necessary to house the subnets, and RDS instances must exist within a VPC.
-
- 2. Subnets:
-
-      -  Two subnets (aws_subnet.wordpress_subnet_1 and aws_subnet.wordpress_subnet_2) are created in different Availability Zones. This ensures high availability, which is often a requirement for RDS.
-
- 3. DB Subnet Group:
-
-      -  The aws_db_subnet_group.wordpress_db_subnet_group associates the two subnets with the RDS instance. RDS instances require a subnet group to ensure proper placement in the VPC. This prevents the "No default subnet" error by explicitly defining the subnets.
-
- 4. Security Group:
-
-     -  The security group (aws_security_group.wordpress_db_sg) allows traffic on port 3306, which is the default for MySQL. In production, you should restrict the ingress rule to specific IPs or security groups instead of using 0.0.0.0/0 (which allows access from anywhere).
-
- 5. RDS Instance:
-
-    - The aws_db_instance.wordpress_db resource creates a MySQL RDS instance using the DB subnet group and the security group. This ensures that the RDS instance is placed within the defined subnets of the VPC and prevents any subnet-related errors.
-
- 6. Additional Steps (If Needed):
-
-    - VPC NAT Gateways: If your RDS instance needs to communicate with the internet (e.g., for backups or updates), ensure your VPC includes an internet gateway and NAT gateways for public and private subnets, respectively.
-
-    Restricting Security Group: Replace "0.0.0.0/0" in the ingress rule of the security group with specific IP ranges to secure your database instance.
-    
     
 
 
